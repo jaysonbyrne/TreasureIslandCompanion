@@ -554,6 +554,7 @@ def render_chapter_pdf(num):
     pdf.set_author("Collected for the reader's amusement")
     render_divider(pdf, ch, num)
     plates = ch.get("plates", [])
+    placed = set()
     first = True
     for i, doc in enumerate(ch["docs"]):
         style = doc.get("style", "prose")
@@ -564,7 +565,7 @@ def render_chapter_pdf(num):
         else:
             RENDERERS[style](pdf, doc)
         first = False
-        for pl in plates:
+        for pi, pl in enumerate(plates):
             if pl.get("after_doc") == i:
                 img = pl["file"]
                 if not os.path.isabs(img):
@@ -572,8 +573,21 @@ def render_chapter_pdf(num):
                 if os.path.exists(img):
                     pdf.plate(pl.get("numeral", "Plate."), img,
                               pl["title"], pl["caption"])
+                    placed.add(pi)
                 else:
                     print(f"warning: missing plate image {img}, skipped")
+    # Any plate never placed (e.g. chapters with no documents) goes here,
+    # in listed order, so no plate is ever silently dropped.
+    for pi, pl in enumerate(plates):
+        if pi not in placed:
+            img = pl["file"]
+            if not os.path.isabs(img):
+                img = os.path.join(chdir, img)
+            if os.path.exists(img):
+                pdf.plate(pl.get("numeral", "Plate."), img,
+                          pl["title"], pl["caption"])
+            else:
+                print(f"warning: missing plate image {img}, skipped")
     out = os.path.join(chdir, f"treasure_ch{nn}_packet.pdf")
     pdf.output(out)
     print(f"wrote {out} ({pdf.page_no()} pages)")
